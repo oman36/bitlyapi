@@ -82,6 +82,7 @@ class BitlyAPI:
         if self.token:
             kwargs['access_token'] = self.token
 
+        logger.debug('Request("%s", data=%s)', url, kwargs)
         response = await self._retry(func, url, data=kwargs)
         text = await response.text()
         if response.status != 200:
