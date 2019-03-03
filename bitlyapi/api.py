@@ -85,7 +85,7 @@ class BitlyAPI:
         response = await self._retry(func, url, data=kwargs)
         text = await response.text()
         if response.status != 200:
-            raise HttpException(response.code, response.text)
+            raise HttpException(response.status, text)
 
         data = json.loads(text, object_hook=lambda d: namedtuple('Response', d.keys())(*d.values()))
 
