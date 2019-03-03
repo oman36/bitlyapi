@@ -53,6 +53,7 @@ class BitlyAPI:
         self.client_secret = client_secret
         self.token = token
         self._session = None  # type: aiohttp.ClientSession
+        self.lock = asyncio.Lock()
 
     async def _retry(self, func, *args, **kwargs):
         last_exception = None
@@ -106,17 +107,17 @@ class BitlyAPI:
                                               grant_type='password')).access_token
 
     async def __aenter__(self):
-        if self.token:
-
-            self._session = aiohttp.ClientSession()
-        else:
-            self._session = aiohttp.ClientSession(auth=BasicAuth(self.client_id, self.client_secret))
-            try:
-                self.token = await self._get_token()
-            except BaseException as e:
-                await self._session.close()
-                self._session = None
-                raise e
+        async with self.lock:
+            if self.token:
+                self._session = aiohttp.ClientSession()
+            else:
+                self._session = aiohttp.ClientSession(auth=BasicAuth(self.client_id, self.client_secret))
+                try:
+                    self.token = await self._get_token()
+                except BaseException as e:
+                    await self._session.close()
+                    self._session = None
+                    raise e
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
