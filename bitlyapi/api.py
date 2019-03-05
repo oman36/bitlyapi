@@ -90,12 +90,11 @@ class BitlyAPI:
         is_non_versioned = _path in self.NON_VERSIONED
         prefix = '' if is_non_versioned else self.VERSION_PREFIX
         url = self.ENTRYPOINT + '/' + prefix + _path
-        func = getattr(self._session, _method)
         if self.token:
             kwargs['access_token'] = self.token
 
         logger.debug('Request("%s", data=%s)', url, kwargs)
-        response = await self._retry(func, url, data=kwargs)
+        response = await self._retry(self._session.request, _method, url, data=kwargs)
         text = await response.text()
         if response.status != 200:
             raise HttpException(response.status, text)
