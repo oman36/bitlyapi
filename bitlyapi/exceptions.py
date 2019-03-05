@@ -8,19 +8,11 @@ class HttpException(APIException):
         self.text = text
 
     def __str__(self):
-        return '[%d] %s' % (self.code, self.text)
+        return f'[{self.code}] {self.text}'
 
 
 class ApiStatusException(HttpException):
     pass
-
-
-class HttpMethodNotAllowedException(APIException):
-    def __init__(self, method):
-        self.method = method
-
-    def __str__(self):
-        return 'Method "%s" not allowed' % self.method
 
 
 class SessionRequiredException(APIException):

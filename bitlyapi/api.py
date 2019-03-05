@@ -5,10 +5,13 @@ import json
 import aiohttp
 from aiohttp import BasicAuth
 
-from bitlyapi.exceptions import ApiStatusException, HttpException, HttpMethodNotAllowedException,\
-    SessionRequiredException, AuthException
+from bitlyapi.decorators import retry_request
+from bitlyapi.exceptions import ApiStatusException, HttpException,SessionRequiredException, AuthException
 
 logger = logging.getLogger(__name__)
+
+request_retry_count = 5
+request_retry_timeout = 1.0
 
 
 class ResponseObject:
@@ -27,32 +30,16 @@ class ResponseObject:
         return f'{self.__class__.__name__}({self._data})'
 
 
-class _BitlyQuery:
-    PATH_METHOD = {
-        'oauth/access_token': 'post',
-    }
-    DEFAULT_METHOD = 'get'
-
-    def __init__(self, api: 'BitlyAPI', path: str):
-        self.path = path
-        self.api = api
-
-    def __getattr__(self, item):
-        return _BitlyQuery(self.api, f'{self.path}/{item}')
-
-    async def __call__(self, **kwargs):
-        method = self.PATH_METHOD.get(self.path, self.DEFAULT_METHOD)
-        return await self.api(_method=method, _path=self.path, **kwargs)
-
-
 class BitlyAPI:
     ENTRYPOINT = 'https://api-ssl.bitly.com'
-    RETRIES = 5
-    TIMEOUT = 1
     VERSION_PREFIX = 'v3/'
     NON_VERSIONED = {
         'oauth/access_token',
     }
+    PATH_METHOD = {
+        'oauth/access_token': 'post',
+    }
+    DEFAULT_METHOD = 'get'
 
     def __init__(self, username: str = None, password: str = None,
                  client_id: str = None, client_secret: str = None,
@@ -67,34 +54,28 @@ class BitlyAPI:
         self._session = None  # type: aiohttp.ClientSession
         self.lock = asyncio.Lock()
 
-    async def _retry(self, func, *args, **kwargs):
-        last_exception = None
-        retries_count = 0
-        while retries_count < self.RETRIES:
-            retries_count += 1
-            try:
-                return await func(*args, **kwargs)
-            except aiohttp.ClientError as ex:
-                logger.info('Retrying %d because of %s' % (retries_count, ex))
-                last_exception = ex
-                await asyncio.sleep(self.TIMEOUT)
-        raise last_exception
-
-    async def __call__(self, _method: str, _path: str, **kwargs):
+    @retry_request(retries=request_retry_count, timeout=request_retry_timeout)
+    async def _send_request(self, _method, url, data):
         if self._session is None:
             raise SessionRequiredException()
+        return await self._session.request(_method, url, data=data)
 
-        if not hasattr(self._session, _method):
-            raise HttpMethodNotAllowedException(_method)
-
-        is_non_versioned = _path in self.NON_VERSIONED
+    async def _make_request(self, path: str, data):
+        is_non_versioned = path in self.NON_VERSIONED
         prefix = '' if is_non_versioned else self.VERSION_PREFIX
-        url = self.ENTRYPOINT + '/' + prefix + _path
-        if self.token:
-            kwargs['access_token'] = self.token
+        url = f'{self.ENTRYPOINT}/{prefix}{path}'
+        method = self.PATH_METHOD.get(path, self.DEFAULT_METHOD)
 
-        logger.debug('Request("%s", data=%s)', url, kwargs)
-        response = await self._retry(self._session.request, _method, url, data=kwargs)
+        if self.token:
+            data['access_token'] = self.token
+
+        logger.debug('Request("%s", data=%s)', url, data)
+        response = await self._send_request(method, url, data)
+
+        return await self._get_data_from_response(response, is_non_versioned)
+
+    @staticmethod
+    async def _get_data_from_response(response, is_non_versioned):
         text = await response.text()
         if response.status != 200:
             raise HttpException(response.status, text)
@@ -112,7 +93,7 @@ class BitlyAPI:
         return data if is_non_versioned else data.data
 
     def __getattr__(self, name: str):
-        return _BitlyQuery(self, name)
+        return self._BitlyQuery(self, name)
 
     async def _get_token(self) -> str:
         params = {'password': self.password, 'username': self.username, 'grant_type': 'password'}
@@ -137,3 +118,15 @@ class BitlyAPI:
         await self._session.close()
         self._session = None
         return False
+
+    class _BitlyQuery:
+        def __init__(self, api: 'BitlyAPI', path: str):
+            self._path = path
+            self._api = api
+
+        def __getattr__(self, item):
+            return self.__class__(self._api, f'{self._path}/{item}')
+
+        async def __call__(self, **kwargs):
+
+            return await self._api._make_request(path=self._path, data=kwargs)
