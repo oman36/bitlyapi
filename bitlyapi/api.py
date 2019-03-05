@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import json
-from collections import namedtuple
 
 import aiohttp
 from aiohttp import BasicAuth
@@ -12,9 +11,20 @@ from bitlyapi.exceptions import ApiStatusException, HttpException, HttpMethodNot
 logger = logging.getLogger(__name__)
 
 
-def dict_to_response_object(d: dict):
-    ResponseObject = namedtuple('ResponseObject', d.keys())
-    return ResponseObject(**d)
+class ResponseObject:
+    __slots__ = '_data'
+
+    def __init__(self, data: dict):
+        self._data = data
+
+    def __getattr__(self, name):
+        if name not in self._data:
+            raise AttributeError("ResponseObject has no attribute '%s'" % name)
+
+        return self._data[name]
+
+    def __repr__(self):
+        return '%s(%s)' % (self.__class__.__name__, self._data)
 
 
 class _BitlyQuery:
@@ -90,7 +100,7 @@ class BitlyAPI:
         if response.status != 200:
             raise HttpException(response.status, text)
 
-        data = json.loads(text, object_hook=dict_to_response_object)
+        data = json.loads(text, object_hook=ResponseObject)
 
         if is_non_versioned:
             status_code = getattr(data, 'status_code', 200)
