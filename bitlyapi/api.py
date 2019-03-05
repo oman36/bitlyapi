@@ -12,6 +12,11 @@ from bitlyapi.exceptions import ApiStatusException, HttpException, HttpMethodNot
 logger = logging.getLogger(__name__)
 
 
+def dict_to_response_object(d: dict):
+    ResponseObject = namedtuple('ResponseObject', d.keys())
+    return ResponseObject(**d)
+
+
 class _BitlyQuery:
     PATH_METHOD = {
         'oauth/access_token': 'post',
@@ -85,7 +90,7 @@ class BitlyAPI:
         if response.status != 200:
             raise HttpException(response.status, text)
 
-        data = json.loads(text, object_hook=lambda d: namedtuple('Response', d.keys())(*d.values()))
+        data = json.loads(text, object_hook=dict_to_response_object)
 
         if is_non_versioned:
             status_code = getattr(data, 'status_code', 200)
