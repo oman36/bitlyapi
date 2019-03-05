@@ -116,8 +116,9 @@ class BitlyAPI:
         return _BitlyQuery(self, name)
 
     async def _get_token(self) -> str:
-        return (await self.oauth.access_token(password=self.password, username=self.username,
-                                              grant_type='password')).access_token
+        params = {'password': self.password, 'username': self.username, 'grant_type': 'password'}
+        response = await self.oauth.access_token(**params)
+        return response.access_token
 
     async def __aenter__(self):
         async with self.lock:
