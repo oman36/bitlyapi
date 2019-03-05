@@ -21,8 +21,13 @@ def retry_request(retries: int = 5, timeout: float = 1.0):
                     logger.info('Retrying %d because of %s' % (retries_count, ex))
                     last_exception = ex
                     await asyncio.sleep(timeout)
-            raise last_exception
+            if last_exception is not None:
+                raise last_exception
 
         return request
+
+    if callable(retries):
+        f, retries = retries, 5
+        return decorator(f)
 
     return decorator
