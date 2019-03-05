@@ -19,12 +19,12 @@ class ResponseObject:
 
     def __getattr__(self, name):
         if name not in self._data:
-            raise AttributeError("ResponseObject has no attribute '{}'".format(name))
+            raise AttributeError(f'ResponseObject has no attribute "{name}"')
 
         return self._data[name]
 
     def __repr__(self):
-        return '{}({})'.format(self.__class__.__name__, self._data)
+        return f'{self.__class__.__name__}({self._data})'
 
 
 class _BitlyQuery:
@@ -38,7 +38,7 @@ class _BitlyQuery:
         self.api = api
 
     def __getattr__(self, item):
-        return _BitlyQuery(self.api, '{}/{}'.format(self.path, item))
+        return _BitlyQuery(self.api, f'{self.path}/{item}')
 
     async def __call__(self, **kwargs):
         method = self.PATH_METHOD.get(self.path, self.DEFAULT_METHOD)
