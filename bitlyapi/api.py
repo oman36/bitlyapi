@@ -128,5 +128,4 @@ class BitlyAPI:
             return self.__class__(self._api, f'{self._path}/{item}')
 
         async def __call__(self, **kwargs):
-
             return await self._api._make_request(path=self._path, data=kwargs)
