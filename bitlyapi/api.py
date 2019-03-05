@@ -13,23 +13,20 @@ logger = logging.getLogger(__name__)
 
 
 class _BitlyQuery:
-    DEFAULT_METHODS = {
+    PATH_METHOD = {
         'oauth/access_token': 'post',
     }
+    DEFAULT_METHOD = 'get'
 
-    def __init__(self, api: 'BitlyAPI', path: str, method: str = None):
+    def __init__(self, api: 'BitlyAPI', path: str):
         self.path = path
         self.api = api
-        self.method = method
 
     def __getattr__(self, item):
-        if item in ('get', 'post', 'delete', 'patch', 'put', 'head'):
-            return _BitlyQuery(self.api, self.path, method=item)
-        else:
-            return _BitlyQuery(self.api, self.path + "/" + item)
+        return _BitlyQuery(self.api, self.path + "/" + item)
 
     async def __call__(self, **kwargs):
-        method = self.method or self.DEFAULT_METHODS.get(self.path, 'get')
+        method = self.PATH_METHOD.get(self.path, self.DEFAULT_METHOD)
         return await self.api(_method=method, _path=self.path, **kwargs)
 
 
