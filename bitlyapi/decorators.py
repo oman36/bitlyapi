@@ -13,8 +13,7 @@ def retry_request(retries: int = 5, timeout: float = 1.0):
         async def request(*args, **kwargs):
             last_exception = None
             retries_count = 0
-            while retries_count < retries:
-                retries_count += 1
+            for i in range(retries):
                 try:
                     return await func(*args, **kwargs)
                 except aiohttp.ClientError as ex:
