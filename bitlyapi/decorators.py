@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import logging
 from functools import wraps
 
@@ -7,7 +8,7 @@ import aiohttp
 logger = logging.getLogger(__name__)
 
 
-def retry_request(retries: int = 5, timeout: float = 1.0):
+def retry_request(_func=None, *, retries: int = 5, timeout: float = 1.0):
     def decorator(func):
         @wraps(func)
         async def request(*args, **kwargs):
@@ -25,8 +26,7 @@ def retry_request(retries: int = 5, timeout: float = 1.0):
 
         return request
 
-    if callable(retries):
-        f, retries = retries, 5
-        return decorator(f)
+    if inspect.iscoroutinefunction(_func):
+        return decorator(_func)
 
     return decorator
